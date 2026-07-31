@@ -85,12 +85,21 @@ def first_bash_block(reply):
     return m.group(1).strip() if m else None
 
 
-def show_rollout(rollout):
-    """Trajectory table, commands issued, and the candidate patch."""
+def show_rollout(rollout, preview=160):
+    """Trajectory table, commands issued, and the candidate patch.
+
+    `preview` caps the preview column; pass None to show messages in full.
+    """
     def author(i, m):
         if m["role"] == "assistant":
             return "model"
         return "harness" if i < 2 else "environment"
+
+    def shorten(text):
+        one_line = text.replace("\n", " | ")
+        if preview is None or len(one_line) <= preview:
+            return one_line
+        return one_line[:preview] + " […]"
 
     msgs = rollout["messages"]
     n_turns = (len(msgs) - 2) // 2
@@ -100,7 +109,7 @@ def show_rollout(rollout):
         {"i": i, "turn": "setup" if i < 2 else (i - 2) // 2,
          "role": m["role"], "written by": author(i, m),
          "chars": len(m["content"]),
-         "preview": m["content"][:70].replace("\n", " | ")}
+         "preview": shorten(m["content"])}
         for i, m in enumerate(msgs)
     ]))
 
@@ -176,7 +185,7 @@ class MockEnv:
         if m:                                   # real effect on the virtual FS
             path, body = m.group(1), m.group(2)
             self.fs[path] = body
-            return f"[mock] wrote {len(body.splitlines())} lines to {path}"
+            return f"[mock env] wrote {len(body.splitlines())} lines to {path}"
 
         if cmd.strip().startswith("ls"):        # canned
             return "\n".join(sorted(self.fs)) + "\nsetup.py\nREADME.rst\ntests/"
@@ -184,7 +193,7 @@ class MockEnv:
         if cmd.strip().startswith("cat "):      # real source, one function of it
             path = cmd.split()[-1]
             if path in self.fs:
-                return ("[mock: only the region near the bug is available]\n"
+                return ("[mock env] only the region near the bug is available\n"
                         + self.fs[path])
             return f"cat: {path}: No such file or directory"
 
@@ -198,10 +207,12 @@ class MockEnv:
 
         if "pytest" in cmd:                     # canned failure, real test names
             body = "\n".join(f"FAILED {n}" for n in self.failing_tests)
-            return (f"[mock] {body}\n=== {len(self.failing_tests)} failed ===\n"
-                    "(mock never actually runs anything)")
+            return (f"{body}\n=== {len(self.failing_tests)} failed ===\n"
+                    "[mock env] test names are real, but nothing was executed")
 
-        return f"[mock] '{cmd.split()[0]}' not implemented in this stub"
+        name = cmd.split()[0] if cmd.split() else cmd
+        return (f"bash: {name}: command not found\n"
+                "[mock env] implements only: ls, cat, grep, pytest, cat > FILE <<'EOF'")
 
     def patch(self):
         """The candidate patch: a real unified diff of the virtual FS.

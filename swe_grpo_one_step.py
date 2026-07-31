@@ -143,6 +143,10 @@ def grpo_step(model, tok, group, reward, device, lr=LR):
     adv = (rewards - rewards.mean()) / (rewards.std(unbiased=False) + 1e-4)
 
     print(f"mean reward {rewards.mean():.3f}   std {rewards.std(unbiased=False):.3f}")
+    if rewards.std(unbiased=False) < 1e-8:
+        print("\n  DEGENERATE GROUP: every rollout scored the same, so every advantage is 0\n"
+              "  and this update is a no-op. Not a bug -- it is the usual outcome when a\n"
+              f"  0.5B model rarely earns reward. Re-run, or raise GROUP_SIZE (now {GROUP_SIZE}).\n")
     display(pd.DataFrame({
         "rollout":    list(range(len(group))),
         "reward":     rewards.numpy().round(3),
