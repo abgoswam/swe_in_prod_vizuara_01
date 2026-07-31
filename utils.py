@@ -112,6 +112,24 @@ def show_rollout(rollout):
     print(rollout["patch"] or "(no file changed)")
 
 
+def show_group(group, reward):
+    """Summary table for a group of rollouts, then every trace verbatim."""
+    display(pd.DataFrame([
+        {"rollout":     i,
+         "reward":      reward[i],
+         "patch_lines": len(r["patch"].split("\n")) if r["patch"] else 0,
+         "n_commands":  len(r["calls"])}
+        for i, r in enumerate(group)
+    ]))
+
+    for i, r in enumerate(group):
+        print(f"\n================ rollout {i} ================")
+        for cmd in r["calls"]:
+            print("  $", cmd)
+        print("\ncandidate patch:")
+        print(r["patch"] or "(no file changed)")
+
+
 def scripted_sampler(replies):
     """A stand-in for `generate`: replays canned replies, ignoring the prompt.
 
