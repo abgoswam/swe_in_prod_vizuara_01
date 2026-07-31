@@ -88,13 +88,16 @@ def run_agent(model, tok, inst, fail_to_pass, max_turns=MAX_TURNS,
     return dict(messages=context, patch=env.patch(), final=dict(env.fs), calls=env.calls)
 
 
-def reward_random(rng):
+def reward_random(patch, rng):
     """Stand-in for a real verifier (unit tests, or a reward model).
 
-    One call = one rollout's reward, drawn when that episode ends. Carries NO
-    information about rollout quality -- it only lets us show how the update
-    consumes a reward.
+    A real verifier applies test_patch plus the candidate patch and runs the
+    tests. This one only asks "did the agent change anything?" -- 0 when the
+    rollout produced no patch, a random score when it did. Called once per
+    rollout, when that episode ends.
     """
+    if not patch:
+        return 0.0
     return round(float(rng.random()), 3)
 
 
@@ -199,7 +202,7 @@ def main():
     group, reward = [], []
     for i in range(GROUP_SIZE):
         rollout = run_agent(model, tok, inst, fail_to_pass)
-        score = reward_random(rng)
+        score = reward_random(rollout["patch"], rng)
         group.append(rollout)
         reward.append(score)
         print(f"rollout {i}: {len(rollout['calls'])} commands, "
