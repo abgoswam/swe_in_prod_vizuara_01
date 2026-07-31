@@ -204,11 +204,16 @@ class MockEnv:
         return f"[mock] '{cmd.split()[0]}' not implemented in this stub"
 
     def patch(self):
-        """The candidate patch: a real unified diff of the virtual FS."""
+        """The candidate patch: a real unified diff of the virtual FS.
+
+        A file the agent created did not exist at the start, so it diffs
+        against empty -- the same as `git diff` for a new file.
+        """
         out = []
         for path, body in self.fs.items():
-            if body != self.orig[path]:
+            before = self.orig.get(path, "")
+            if body != before:
                 out += list(difflib.unified_diff(
-                    self.orig[path].split("\n"), body.split("\n"),
+                    before.split("\n"), body.split("\n"),
                     fromfile=f"a/{path}", tofile=f"b/{path}", lineterm=""))
         return "\n".join(out)
